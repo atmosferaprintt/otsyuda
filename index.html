@@ -120,10 +120,27 @@
     width: 100%; min-height: 68px; resize: vertical; box-sizing: border-box;
     background: var(--surface-2); border: 1px solid var(--rule); border-radius: 4px;
     padding: 10px 12px; font-family: 'Golos Text', sans-serif; font-size: 13.5px; line-height: 1.5;
-    color: var(--ink); margin: 0;
+    color: var(--ink); margin: 0 0 10px;
   }
   textarea.note-box::placeholder{ color: var(--ink-faint); }
   textarea.note-box:focus{ outline: none; border-color: var(--accent); }
+
+  .note-row{ display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  button.save-btn{
+    font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
+    background: var(--accent); color: var(--accent-ink); border: none; border-radius: 4px; padding: 8px 16px; cursor: pointer;
+  }
+  button.save-btn.done{ background: var(--surface-2); color: var(--ink-faint); border: 1px solid var(--rule); }
+  .note-pinned{
+    background: var(--surface-2); border-left: 3px solid var(--accent); border-radius: 0 4px 4px 0;
+    padding: 12px 14px; font-size: 13.5px; line-height: 1.55; color: var(--ink); white-space: pre-wrap; margin: 0 0 10px;
+  }
+  .note-view-row{ display: flex; align-items: center; gap: 12px; }
+  .note-edit-link{
+    font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
+    background: transparent; color: var(--ink-faint); border: 1px solid var(--rule); border-radius: 4px; padding: 6px 12px; cursor: pointer;
+  }
+  .note-edit-link:hover{ border-color: var(--accent); color: var(--accent); }
 
   .export{ background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 24px 26px 26px; margin: 20px 0 40px; box-shadow: 0 3px 16px var(--shadow); }
   .export p.hint{ font-size: 13.5px; line-height: 1.6; color: var(--ink-soft); margin: 0 0 16px; max-width: 62ch; }
@@ -158,12 +175,15 @@
   </div>
 
   <div class="idea-note">
-    <p><b>Это идеи, а не готовые тексты.</b> Любую тему можно переписать под себя: поменять формулировки, цифры, примеры и интонацию. Реплики здесь — как каркас, чтобы было от чего оттолкнуться на съёмке, а не сценарий, который надо читать слово в слово. Под каждым пунктом есть поле для комментария — пиши прямо туда, ничего не потеряется при закрытии вкладки. Внизу страницы — кнопка, которая соберёт все комментарии в один текст для отправки.</p>
+    <p><b>Это идеи, а не готовые тексты.</b> Любую тему можно переписать под себя: поменять формулировки, цифры, примеры и интонацию. Реплики здесь — как каркас, чтобы было от чего оттолкнуться на съёмке, а не сценарий, который надо читать слово в слово. Под каждым пунктом есть поле для комментария — напиши и нажми «Сохранить комментарий»: он закрепится прямо под этой темой (можно нажать «Изменить», если нужно поправить). Ничего не потеряется при закрытии вкладки.</p>
   </div>
 
   <div class="progress-bar" id="progress-bar">
     <span>Комментариев заполнено — <b id="progress-count">0 / 23</b></span>
-    <a class="progress-jump" href="#export">К комментариям ↓</a>
+    <span style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button type="button" class="progress-jump" id="save-all" style="cursor:pointer; background:none; font-family:inherit;">Сохранить все</button>
+      <a class="progress-jump" href="#export">К сводке ↓</a>
+    </span>
   </div>
 
   <h2 class="sec">Как собраны темы</h2>
@@ -178,7 +198,7 @@
       <span class="group-title" style="color:var(--accent)">Комментарии</span>
       <span class="group-sub" id="export-count">0 / 23 заполнено</span>
     </div>
-    <p class="hint">Заполняй комментарии прямо под темами выше — они сохраняются в этом браузере автоматически, можно закрыть вкладку и вернуться позже. Когда готова прислать — нажми «Собрать» и отправь получившийся текст (в Telegram, почтой — как удобно). Страница статичная, сама она никуда ничего не отправляет.</p>
+    <p class="hint">Каждый сохранённый комментарий закреплён прямо под своей темой выше — так видно, к чему он относится. Здесь — сводка всех сразу: нажми «Собрать», чтобы получить один текст и отправить его (в Telegram, почтой — как удобно). Страница статичная, сама она никуда ничего не отправляет.</p>
     <div class="export-actions">
       <button type="button" class="xbtn" id="export-collect">Собрать комментарии</button>
       <button type="button" class="xbtn ghost" id="export-copy">Скопировать текст</button>
@@ -572,13 +592,20 @@
         textBlock +
         ovlHtml +
         '<div class="lbl">Подпись</div><p class="cap">' + item.cap + '</p>' +
-        '<div class="note-lbl"><span class="lbl" style="margin:18px 0 0;">Комментарий Раби</span><span class="note-saved" id="saved-' + item.n + '">сохранено</span></div>' +
-        '<textarea class="note-box" id="note-' + item.n + '" data-n="' + item.n + '" placeholder="Что поправить, что нравится, что убрать..."></textarea>';
+        '<div class="note-lbl"><span class="lbl" style="margin:18px 0 0;">Комментарий Раби</span></div>' +
+        '<div class="note-view" id="view-' + item.n + '" style="display:none;">' +
+          '<p class="note-pinned" id="pinned-' + item.n + '"></p>' +
+          '<div class="note-view-row"><button type="button" class="note-edit-link" data-edit="' + item.n + '">Изменить</button><span class="note-saved" id="saved-' + item.n + '">Сохранено</span></div>' +
+        '</div>' +
+        '<div class="note-edit" id="edit-' + item.n + '">' +
+          '<textarea class="note-box" id="note-' + item.n + '" data-n="' + item.n + '" placeholder="Что поправить, что нравится, что убрать..."></textarea>' +
+          '<div class="note-row"><button type="button" class="save-btn" data-save="' + item.n + '">Сохранить комментарий</button></div>' +
+        '</div>';
       groupsEl.appendChild(card);
     });
   });
 
-  // ——— Comments: save locally, restore, export
+  // ——— Comments: save locally, pin under each item, export
   (function(){
     var STORE_KEY = 'otsyuda-notes-v1';
     var TOTAL = ITEMS.length;
@@ -588,7 +615,6 @@
       if (saved) notes = JSON.parse(saved) || {};
     } catch (e) { notes = {}; }
 
-    var boxes = document.querySelectorAll('.note-box');
     var progressCount = document.getElementById('progress-count');
     var exportCount = document.getElementById('export-count');
 
@@ -604,24 +630,62 @@
       try { localStorage.setItem(STORE_KEY, JSON.stringify(notes)); } catch (e) {}
     }
 
-    boxes.forEach(function(box){
-      var n = box.getAttribute('data-n');
-      if (notes[n]) box.value = notes[n];
-      var savedTag = document.getElementById('saved-' + n);
-      var timer = null;
-      box.addEventListener('input', function(){
-        notes[n] = box.value;
-        persist();
-        updateCounts();
-        if (savedTag) {
-          savedTag.classList.add('show');
-          clearTimeout(timer);
-          timer = setTimeout(function(){ savedTag.classList.remove('show'); }, 1200);
-        }
-      });
+    function showView(n){
+      document.getElementById('pinned-' + n).textContent = notes[n];
+      document.getElementById('view-' + n).style.display = '';
+      document.getElementById('edit-' + n).style.display = 'none';
+    }
+    function showEdit(n){
+      document.getElementById('note-' + n).value = notes[n] || '';
+      document.getElementById('view-' + n).style.display = 'none';
+      document.getElementById('edit-' + n).style.display = '';
+    }
+    function flashSaved(n){
+      var tag = document.getElementById('saved-' + n);
+      if (!tag) return;
+      tag.classList.add('show');
+      setTimeout(function(){ tag.classList.remove('show'); }, 1600);
+    }
+    function saveOne(n){
+      var box = document.getElementById('note-' + n);
+      var val = box.value.trim();
+      if (!val) return;
+      notes[n] = val;
+      persist();
+      updateCounts();
+      showView(n);
+      flashSaved(n);
+    }
+
+    // Initial render: pinned view for saved comments, edit box for the rest
+    ITEMS.forEach(function(item){
+      var n = item.n;
+      if (notes[n] && notes[n].trim()) showView(n); else showEdit(n);
+    });
+    updateCounts();
+
+    groupsEl.addEventListener('click', function(e){
+      var saveBtn = e.target.closest('[data-save]');
+      if (saveBtn) { saveOne(saveBtn.getAttribute('data-save')); return; }
+      var editBtn = e.target.closest('[data-edit]');
+      if (editBtn) { showEdit(editBtn.getAttribute('data-edit')); return; }
     });
 
-    updateCounts();
+    // Ctrl/Cmd+Enter in a textarea saves it too
+    groupsEl.addEventListener('keydown', function(e){
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && e.target.classList.contains('note-box')) {
+        saveOne(e.target.getAttribute('data-n'));
+      }
+    });
+
+    var saveAllBtn = document.getElementById('save-all');
+    if (saveAllBtn) {
+      saveAllBtn.addEventListener('click', function(){
+        document.querySelectorAll('.note-edit textarea.note-box').forEach(function(box){
+          if (box.value.trim()) saveOne(box.getAttribute('data-n'));
+        });
+      });
+    }
 
     function buildText(){
       var lines = ['КОММЕНТАРИИ К «ОТСЮДА»', ''];
@@ -673,7 +737,7 @@
       if (!window.confirm || confirm('Стереть все комментарии на этой странице? Это нельзя отменить.')) {
         notes = {};
         persist();
-        boxes.forEach(function(box){ box.value = ''; });
+        ITEMS.forEach(function(item){ showEdit(item.n); });
         outBox.value = '';
         updateCounts();
       }
