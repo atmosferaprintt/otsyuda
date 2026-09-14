@@ -179,7 +179,7 @@
   </div>
 
   <div class="progress-bar" id="progress-bar">
-    <span>Комментариев заполнено — <b id="progress-count">0 / 23</b></span>
+    <span>Комментариев заполнено — <b id="progress-count">0 / 23</b> <span id="cloud-status" style="color:var(--ink-faint); text-transform:none; letter-spacing:0;"></span></span>
     <span style="display:flex; gap:8px; flex-wrap:wrap;">
       <button type="button" class="progress-jump" id="save-all" style="cursor:pointer; background:none; font-family:inherit;">Сохранить все</button>
       <a class="progress-jump" href="#export">К сводке ↓</a>
@@ -605,7 +605,7 @@
     });
   });
 
-  // ——— Comments: save locally, pin under each item, export
+  // ——— Comments: save locally + to shared cloud storage, pin under each item, export
   (function(){
     var STORE_KEY = 'otsyuda-notes-v1';
     var TOTAL = ITEMS.length;
@@ -615,8 +615,15 @@
       if (saved) notes = JSON.parse(saved) || {};
     } catch (e) { notes = {}; }
 
+    var BIN_ID = '6aa7bc94ffd5d16053045103';
+    var BIN_URL = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
+    var ACCESS_KEY = '$2a$10$pBWFMZef8XfM/hW8fDEvpeU4/N4XxGV/O2D7.TsicygRRy/n34XHa';
+
     var progressCount = document.getElementById('progress-count');
     var exportCount = document.getElementById('export-count');
+    var cloudStatus = document.getElementById('cloud-status');
+
+    function setCloudStatus(text){ if (cloudStatus) cloudStatus.textContent = text; }
 
     function filledCount(){
       return Object.keys(notes).filter(function(k){ return notes[k] && notes[k].trim(); }).length;
@@ -628,6 +635,43 @@
     }
     function persist(){
       try { localStorage.setItem(STORE_KEY, JSON.stringify(notes)); } catch (e) {}
+    }
+    function pushCloud(){
+      setCloudStatus('· сохраняю...');
+      fetch(BIN_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Access-Key': ACCESS_KEY },
+        body: JSON.stringify({ notes: notes })
+      }).then(function(r){
+        setCloudStatus(r.ok ? '· сохранено для всех' : '· сохранено только у вас');
+      }).catch(function(){
+        setCloudStatus('· сохранено только у вас (нет сети)');
+      });
+    }
+    function pullCloud(initial){
+      setCloudStatus('· загружаю...');
+      fetch(BIN_URL + '/latest', { headers: { 'X-Access-Key': ACCESS_KEY } })
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          var remote = (data && data.record && data.record.notes) || {};
+          var merged = Object.assign({}, notes, remote);
+          var changed = JSON.stringify(merged) !== JSON.stringify(notes);
+          notes = merged;
+          if (changed) {
+            persist();
+            ITEMS.forEach(function(item){
+              var editEl = document.getElementById('edit-' + item.n);
+              var isEditingOpen = editEl && editEl.style.display !== 'none' && document.activeElement === document.getElementById('note-' + item.n);
+              if (isEditingOpen) return;
+              if (notes[item.n] && notes[item.n].trim()) showView(item.n); else showEdit(item.n);
+            });
+            updateCounts();
+          }
+          setCloudStatus('· синхронизировано');
+        })
+        .catch(function(){
+          setCloudStatus(initial ? '· офлайн, показаны локальные' : '· офлайн');
+        });
     }
 
     function showView(n){
@@ -655,6 +699,7 @@
       updateCounts();
       showView(n);
       flashSaved(n);
+      pushCloud();
     }
 
     // Initial render: pinned view for saved comments, edit box for the rest
@@ -663,6 +708,9 @@
       if (notes[n] && notes[n].trim()) showView(n); else showEdit(n);
     });
     updateCounts();
+
+    pullCloud(true);
+    setInterval(function(){ pullCloud(false); }, 20000);
 
     groupsEl.addEventListener('click', function(e){
       var saveBtn = e.target.closest('[data-save]');
@@ -740,6 +788,7 @@
         ITEMS.forEach(function(item){ showEdit(item.n); });
         outBox.value = '';
         updateCounts();
+        pushCloud();
       }
     });
   })();
